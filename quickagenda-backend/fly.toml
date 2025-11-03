@@ -5,9 +5,9 @@ primary_region = "arn"  # Europe, close to your Supabase eu-north-1
   dockerfile = "Dockerfile"
 
 [env]
-  SPRING_DATASOURCE_URL = "jdbc:postgresql://db.iiyxexrahfdntjdmwlnn.supabase.co:5432/postgres?sslmode=require"
+  SPRING_DATASOURCE_URL = "jdbc:postgresql://db.YOUR_SUPABASE_PROJECT_ID.supabase.co:5432/postgres?sslmode=require"
   SPRING_DATASOURCE_USERNAME = "postgres"
-  SPRING_DATASOURCE_PASSWORD = "J*/f57wPbpG*kEn"
+  SPRING_DATASOURCE_PASSWORD = "YOUR_POSTGRE_PASSWORD"
   SERVER_ADDRESS = "0.0.0.0"
 
 [http_service]
