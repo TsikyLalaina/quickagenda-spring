@@ -1,0 +1,21 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+spring:
+  datasource:
+    # Use Supabase pooled endpoint; override via env in production
+    url: "jdbc:postgresql://aws-1-eu-north-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    username: "postgres.iiyxexrahfdntjdmwlnn"
+    password: "J*/f57wPbpG*kEn"
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      data-source-properties:
+        preferQueryMode: simple   # Avoid server-side prepared statements (pgBouncer transaction pooling)
+        prepareThreshold: 0       # Force simple mode; extra safety
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true

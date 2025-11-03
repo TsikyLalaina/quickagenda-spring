@@ -1,0 +1,18 @@
+app = "quickagenda-backend"
+primary_region = "arn"  # Europe, close to your Supabase eu-north-1
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  SPRING_DATASOURCE_URL = "jdbc:postgresql://db.iiyxexrahfdntjdmwlnn.supabase.co:5432/postgres?sslmode=require"
+  SPRING_DATASOURCE_USERNAME = "postgres"
+  SPRING_DATASOURCE_PASSWORD = "J*/f57wPbpG*kEn"
+  SERVER_ADDRESS = "0.0.0.0"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
