@@ -4,9 +4,9 @@ server:
 spring:
   datasource:
     # Use Supabase pooled endpoint; override via env in production
-    url: "jdbc:postgresql://aws-1-eu-north-1.pooler.supabase.com:6543/postgres?sslmode=require"
-    username: "postgres.iiyxexrahfdntjdmwlnn"
-    password: "J*/f57wPbpG*kEn"
+    url: "jdbc:postgresql://YOUR_SUPABASE_URL:6543/postgres?sslmode=require"
+    username: "POSTGRE_USERNAME"
+    password: "POSTGRE_PASSWORD"
     driver-class-name: org.postgresql.Driver
     hikari:
       data-source-properties:
