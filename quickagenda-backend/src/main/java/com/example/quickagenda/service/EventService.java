@@ -53,7 +53,7 @@ public class EventService {
     private final AttendeeRepository attendeeRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${RESEND_API_KEY:re_3JtEz5mU_HdcAfvktWPAHSX8hjJLxMc12}")
+    @Value("${RESEND_API_KEY:}")
     private String resendApiKey;
 
     @Value("${RESEND_FROM:onboarding@resend.dev}")
