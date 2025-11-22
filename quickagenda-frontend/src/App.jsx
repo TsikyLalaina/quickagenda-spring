@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import CalendarView from './CalendarView'
-import AttendeeList from './AttendeeList'
+import FormBuilder from './FormBuilder'
 import Container from '@mui/material/Container'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
@@ -30,7 +30,6 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable'
 import AddIcon from '@mui/icons-material/Add'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
-import SendIcon from '@mui/icons-material/Send'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
@@ -60,8 +59,7 @@ function App() {
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
   const FEEDBACK_MAX = 300
-  const [invitesText, setInvitesText] = useState('')
-  const [sendingInvites, setSendingInvites] = useState(false)
+  
 
   const loadFeedback = async () => {
     try {
@@ -94,31 +92,7 @@ function App() {
     return uniq
   }
 
-  const sendInvites = async () => {
-    if (!shareCode) {
-      setNotice({ type: 'info', text: 'Create the event first' })
-      return
-    }
-    const emails = parseEmails(invitesText)
-    if (emails.length === 0) {
-      setNotice({ type: 'error', text: 'Enter at least one email' })
-      return
-    }
-    try {
-      setSendingInvites(true)
-      const res = await fetch(`/api/events/${shareCode}/invites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails })
-      })
-      if (!res.ok) throw new Error('failed')
-      setNotice({ type: 'success', text: 'Invites sent' })
-    } catch (e) {
-      setNotice({ type: 'error', text: 'Failed to send invites' })
-    } finally {
-      setSendingInvites(false)
-    }
-  }
+  
 
   useEffect(() => { loadFeedback() }, [])
 
@@ -338,19 +312,37 @@ function App() {
                         <Button size="small" variant="text" color="secondary" onClick={resetEvent}>Create New Event</Button>
                       </Stack>
                     )}
-                    {isCreated && (
-                      <AttendeeList code={shareCode} />
-                    )}
+                    {/* RSVP removed: attendee list no longer shown */}
                     {isCreated && (
                       <Stack spacing={1}>
+                        <FormBuilder code={shareCode} />
                         <TextField
-                          placeholder="Enter emails (comma or line)"
+                          label="Organizer email"
+                          placeholder="you@yourdomain.com"
+                          value={organizerEmail}
+                          onChange={(e) => setOrganizerEmail(e.target.value)}
+                          fullWidth
+                        />
+                        <TextField
+                          label="Organizer name (optional)"
+                          placeholder="Your name"
+                          value={organizerName}
+                          onChange={(e) => setOrganizerName(e.target.value)}
+                          fullWidth
+                        />
+                        <TextField
+                          placeholder="Enter invitees (comma, space, or new line separated emails)"
                           value={invitesText}
                           onChange={(e) => setInvitesText(e.target.value)}
                           multiline rows={3}
                           fullWidth
                         />
-                        <Button variant="contained" startIcon={<SendIcon />} disabled={sendingInvites} onClick={sendInvites}>
+                        <Button
+                          variant="contained"
+                          startIcon={<SendIcon />}
+                          disabled={sendingInvites || !/^([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/.test((organizerEmail || '').trim())}
+                          onClick={sendInvites}
+                        >
                           Send Invites
                         </Button>
                       </Stack>

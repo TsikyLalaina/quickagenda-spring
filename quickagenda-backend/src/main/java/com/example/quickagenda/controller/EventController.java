@@ -2,9 +2,6 @@ package com.example.quickagenda.controller;
 
 import com.example.quickagenda.dto.EventCreateRequest;
 import com.example.quickagenda.dto.EventDetailResponse;
-import com.example.quickagenda.dto.InviteRequest;
-import com.example.quickagenda.dto.AttendeeListResponse;
-import com.example.quickagenda.dto.RsvpRequest;
 import com.example.quickagenda.dto.SessionTimeUpdateRequest;
 import com.example.quickagenda.entity.Event;
 import com.example.quickagenda.service.EventService;
@@ -50,32 +47,6 @@ public class EventController {
                                                    @PathVariable("id") Long sessionId,
                                                    @RequestBody SessionTimeUpdateRequest body) {
         eventService.updateSessionTimes(code, sessionId, body);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{code}/invites")
-    public ResponseEntity<Void> sendInvitesPost(@PathVariable("code") String code,
-                                                @RequestBody InviteRequest body) {
-        eventService.sendInvites(code, body);
-        return ResponseEntity.ok().build();
-    }
-
-    @PatchMapping("/{code}/invites")
-    public ResponseEntity<Void> sendInvitesPatch(@PathVariable("code") String code,
-                                                 @RequestBody InviteRequest body) {
-        eventService.sendInvites(code, body);
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/{code}/attendees")
-    public ResponseEntity<AttendeeListResponse> getAttendees(@PathVariable("code") String code) {
-        return ResponseEntity.ok(eventService.getAttendeesByCode(code));
-    }
-
-    @PatchMapping("/{code}/rsvp")
-    public ResponseEntity<Void> upsertRsvp(@PathVariable("code") String code,
-                                           @RequestBody RsvpRequest body) {
-        eventService.upsertRsvp(code, body);
         return ResponseEntity.ok().build();
     }
 }

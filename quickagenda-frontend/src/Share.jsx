@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import CalendarView from './CalendarView'
-import RsvpButtons from './RsvpButtons'
+import DynamicForm from './DynamicForm'
 import QRCode from 'qrcode'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
@@ -51,7 +51,6 @@ export default function Share() {
   const [qrSrc, setQrSrc] = useState('')
   const [copied, setCopied] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [rsvpYes, setRsvpYes] = useState(false)
 
   const shareUrl = useMemo(() => `${window.location.origin}/s/${code}`, [code])
 
@@ -69,11 +68,7 @@ export default function Share() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const em = params.get('email') || ''
-    if (em) {
-      setInviteEmail(em)
-      setRsvpYes(true)
-      try { localStorage.setItem(`rsvp:${code}:${em}`, 'yes') } catch {}
-    }
+    setInviteEmail(em)
   }, [code])
 
   // Render QR code using npm 'qrcode': prefer Data URL (<img>) for reliability
@@ -205,13 +200,13 @@ export default function Share() {
                 <CardContent>
                   <Typography variant="h6" gutterBottom>Actions</Typography>
                   <Stack spacing={1}>
-                    <RsvpButtons code={code} email={inviteEmail} />
                     <Button variant="contained" startIcon={<CalendarMonthIcon />} href={googleLink || '#'} target="_blank" disabled={!googleLink} fullWidth>
                       Add to Google Calendar
                     </Button>
                     <Button variant="outlined" startIcon={<DownloadIcon />} href={`/api/events/${event.shareCode}.ics`} fullWidth>
                       Download .ics
                     </Button>
+                    <DynamicForm code={code} initialEmail={inviteEmail} />
                     <Button variant="text" startIcon={<HomeIcon />} href="/" fullWidth>
                       Create your own event
                     </Button>

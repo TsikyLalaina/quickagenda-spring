@@ -2,19 +2,13 @@ package com.example.quickagenda.service;
 
 import com.example.quickagenda.dto.EventCreateRequest;
 import com.example.quickagenda.dto.EventDetailResponse;
-import com.example.quickagenda.dto.InviteRequest;
-import com.example.quickagenda.dto.AttendeeDto;
-import com.example.quickagenda.dto.AttendeeListResponse;
-import com.example.quickagenda.dto.RsvpRequest;
 import com.example.quickagenda.dto.SessionCreateRequest;
 import com.example.quickagenda.dto.SessionResponse;
 import com.example.quickagenda.dto.SessionTimeUpdateRequest;
 import com.example.quickagenda.entity.Event;
 import com.example.quickagenda.entity.Session;
-import com.example.quickagenda.entity.Attendee;
 import com.example.quickagenda.repository.EventRepository;
 import com.example.quickagenda.repository.SessionRepository;
-import com.example.quickagenda.repository.AttendeeRepository;
 import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.DateTime;
@@ -24,12 +18,7 @@ import net.fortuna.ical4j.model.property.Location;
 import net.fortuna.ical4j.model.property.ProdId;
 import net.fortuna.ical4j.model.property.Version;
 import org.apache.commons.text.RandomStringGenerator;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -50,21 +39,12 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final SessionRepository sessionRepository;
-    private final AttendeeRepository attendeeRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
-
-    @Value("${RESEND_API_KEY:re_3JtEz5mU_HdcAfvktWPAHSX8hjJLxMc12}")
-    private String resendApiKey;
-
-    @Value("${RESEND_FROM:onboarding@resend.dev}")
-    private String resendFrom;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    public EventService(EventRepository eventRepository, SessionRepository sessionRepository, AttendeeRepository attendeeRepository) {
+    public EventService(EventRepository eventRepository, SessionRepository sessionRepository) {
         this.eventRepository = eventRepository;
         this.sessionRepository = sessionRepository;
-        this.attendeeRepository = attendeeRepository;
     }
 
     @Transactional
@@ -175,126 +155,5 @@ public class EventService {
         return gen.generate(6).toUpperCase();
     }
 
-    @Transactional
-    public void sendInvites(String code, InviteRequest request) {
-        Event event = eventRepository.findByShareCode(code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-
-        List<String> emails = request != null ? request.getEmails() : null;
-        if (emails == null || emails.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No emails provided");
-        }
-        boolean canSend = !(resendApiKey == null || resendApiKey.isBlank());
-
-        String subject = "You're invited to " + event.getName() + "!";
-        String eventDate = event.getEventDate() != null ? event.getEventDate().toString() : "";
-        String shareCode = event.getShareCode();
-
-        if (canSend) {
-            for (String email : emails) {
-                if (email == null || email.isBlank()) continue;
-                String link = "http://192.168.1.204:5173/s/" + shareCode + "?email=" + urlEncode(email);
-                String html = "<p>Hi! Join <strong>" + escapeHtml(event.getName()) + "</strong> on " + escapeHtml(eventDate) + ".</p>" +
-                        "<a href=\"" + link + "\">Add to Calendar</a>";
-
-                try {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.setContentType(MediaType.APPLICATION_JSON);
-                    headers.setBearerAuth(resendApiKey);
-
-                    String fromAddress = resendFrom == null || resendFrom.isBlank() ? "onboarding@resend.dev" : resendFrom;
-                    String payload = "{" +
-                            "\"from\":\"QuickAgenda <" + jsonEscape(fromAddress) + ">\"," +
-                            "\"to\":[\"" + jsonEscape(email) + "\"]," +
-                            "\"subject\":\"" + jsonEscape(subject) + "\"," +
-                            "\"html\":\"" + jsonEscape(html) + "\"" +
-                            "}";
-
-                    HttpEntity<String> entity = new HttpEntity<>(payload, headers);
-                    restTemplate.postForEntity("https://api.resend.com/emails", entity, String.class);
-                } catch (Exception ex) {
-                }
-            }
-        }
-
-        // Append to invites_sent JSONB
-        String emailsJson = toJsonArrayOfStrings(emails);
-        eventRepository.appendInvitesByShareCode(code, emailsJson);
-    }
-
-    public AttendeeListResponse getAttendeesByCode(String code) {
-        Event event = eventRepository.findByShareCode(code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        List<Attendee> list = attendeeRepository.findByEvent(event);
-        List<AttendeeDto> dtos = list.stream()
-                .map(a -> new AttendeeDto(a.getId(), a.getEmail(), a.getRsvp()))
-                .collect(Collectors.toList());
-        int yes = 0, no = 0, maybe = 0;
-        for (Attendee a : list) {
-            String r = a.getRsvp();
-            if (r == null) continue;
-            if ("YES".equalsIgnoreCase(r)) yes++;
-            else if ("NO".equalsIgnoreCase(r)) no++;
-            else if ("MAYBE".equalsIgnoreCase(r)) maybe++;
-        }
-        return new AttendeeListResponse(dtos, yes, no, maybe);
-    }
-
-    @Transactional
-    public void upsertRsvp(String code, RsvpRequest body) {
-        Event event = eventRepository.findByShareCode(code)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (body == null || body.getEmail() == null || body.getEmail().isBlank() || body.getRsvp() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email and rsvp required");
-        }
-        String r = body.getRsvp().toUpperCase();
-        if (!r.equals("YES") && !r.equals("NO") && !r.equals("MAYBE")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid rsvp");
-        }
-        String email = body.getEmail().trim();
-        Attendee attendee = attendeeRepository.findByEventAndEmail(event, email)
-                .orElseGet(() -> {
-                    Attendee a = new Attendee();
-                    a.setEvent(event);
-                    a.setEmail(email);
-                    return a;
-                });
-        attendee.setRsvp(r);
-        attendee.setUpdatedAt(java.time.LocalDateTime.now());
-        attendeeRepository.save(attendee);
-    }
-
-    private static String toJsonArrayOfStrings(List<String> emails) {
-        StringBuilder sb = new StringBuilder();
-        sb.append('[');
-        boolean first = true;
-        for (String e : emails) {
-            if (e == null) continue;
-            String t = e.trim();
-            if (t.isEmpty()) continue;
-            if (!first) sb.append(',');
-            sb.append('"').append(jsonEscape(t)).append('"');
-            first = false;
-        }
-        sb.append(']');
-        return sb.toString();
-    }
-
-    private static String urlEncode(String s) {
-        try {
-            return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return s;
-        }
-    }
-
-    private static String jsonEscape(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-    }
-
-    private static String escapeHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
+    
 }
