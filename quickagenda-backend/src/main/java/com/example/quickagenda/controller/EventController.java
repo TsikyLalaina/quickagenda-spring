@@ -2,6 +2,8 @@ package com.example.quickagenda.controller;
 
 import com.example.quickagenda.dto.EventCreateRequest;
 import com.example.quickagenda.dto.EventDetailResponse;
+import com.example.quickagenda.dto.EventUpdateRequest;
+import com.example.quickagenda.dto.SessionCreateRequest;
 import com.example.quickagenda.dto.SessionTimeUpdateRequest;
 import com.example.quickagenda.entity.Event;
 import com.example.quickagenda.service.EventService;
@@ -43,10 +45,28 @@ public class EventController {
     }
 
     @PatchMapping("/{code}/sessions/{id}")
-    public ResponseEntity<Void> updateSessionTimes(@PathVariable String code,
+    public ResponseEntity<EventDetailResponse> updateSessionTimes(@PathVariable String code,
                                                    @PathVariable("id") Long sessionId,
                                                    @RequestBody SessionTimeUpdateRequest body) {
         eventService.updateSessionTimes(code, sessionId, body);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(eventService.getEventByShareCode(code));
+    }
+
+    @PatchMapping("/{code}")
+    public ResponseEntity<EventDetailResponse> updateEvent(@PathVariable String code,
+                                                           @RequestBody EventUpdateRequest request) {
+        return ResponseEntity.ok(eventService.updateEvent(code, request));
+    }
+
+    @PostMapping("/{code}/sessions")
+    public ResponseEntity<EventDetailResponse> addSession(@PathVariable String code,
+                                                          @RequestBody SessionCreateRequest request) {
+        return ResponseEntity.ok(eventService.addSession(code, request));
+    }
+
+    @DeleteMapping("/{code}/sessions/{id}")
+    public ResponseEntity<EventDetailResponse> deleteSession(@PathVariable String code,
+                                                             @PathVariable("id") Long sessionId) {
+        return ResponseEntity.ok(eventService.deleteSession(code, sessionId));
     }
 }

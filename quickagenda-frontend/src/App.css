@@ -1,8 +1,8 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: initial;
 }
 
 .logo {
@@ -39,4 +39,45 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* Responsive improvements */
+@media (max-width: 900px) {
+  #root {
+    padding: 1.25rem;
+    text-align: left;
+  }
+  .qa-cal-grid {
+    grid-template-columns: 60px 1fr !important;
+    gap: 6px !important;
+  }
+  .qa-cal-hours > div {
+    height: 36px !important;
+    font-size: 12px;
+  }
+  .qa-cal-session {
+    min-width: 100px !important;
+    padding: 4px 6px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  #root {
+    padding: 1rem;
+  }
+  .qa-calendar {
+    padding: 8px !important;
+  }
+  .qa-cal-grid {
+    grid-template-columns: 48px 1fr !important;
+    gap: 4px !important;
+  }
+  .qa-cal-hours > div {
+    height: 32px !important;
+    font-size: 11px;
+  }
+  .qa-cal-session {
+    min-width: 88px !important;
+    padding: 3px 5px !important;
+  }
 }

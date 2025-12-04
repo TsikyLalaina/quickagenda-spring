@@ -26,5 +26,7 @@ public class Event {
 
     private LocalDate eventDate;
 
+    private String description;
+
     private String shareCode;
 }

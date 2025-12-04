@@ -13,7 +13,9 @@ import java.time.OffsetDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "forms")
+@Table(name = "forms", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"event_id"})
+})
 public class Form {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

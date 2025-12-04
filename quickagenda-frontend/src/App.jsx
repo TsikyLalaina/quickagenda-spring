@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import CalendarView from './CalendarView'
+import CalendarView from './CalendarViewRBC'
 import FormBuilder from './FormBuilder'
+import ResponsesPanel from './ResponsesPanel'
 import Container from '@mui/material/Container'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
@@ -48,6 +49,7 @@ function hhmmAdd(start, minutes) {
 function App() {
   const [name, setName] = useState('')
   const [eventDate, setEventDate] = useState('') // YYYY-MM-DD
+  const [description, setDescription] = useState('')
   const [sessionTitle, setSessionTitle] = useState('')
   const [duration, setDuration] = useState(60) // minutes
   const [localSessions, setLocalSessions] = useState([]) // before event is created
@@ -58,6 +60,11 @@ function App() {
   const [feedbackList, setFeedbackList] = useState([])
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+  const [isEditingEvent, setIsEditingEvent] = useState(false)
+  const [editingName, setEditingName] = useState('')
+  const [editingDescription, setEditingDescription] = useState('')
+  const [editingDate, setEditingDate] = useState('')
+  const [savingEvent, setSavingEvent] = useState(false)
   const FEEDBACK_MAX = 300
   
 
@@ -79,17 +86,51 @@ function App() {
     setLocalSessions([])
     setName('')
     setEventDate('')
+    setDescription('')
     setSessionTitle('')
-    setInvitesText('')
+    setIsEditingEvent(false)
     try { localStorage.removeItem('qa:shareCode') } catch {}
     setNotice({ type: 'info', text: 'Start a new event' })
   }
 
-  const parseEmails = (raw) => {
-    if (!raw) return []
-    const parts = raw.split(/[\n,;\s]+/g).map(s => (s || '').trim()).filter(Boolean)
-    const uniq = Array.from(new Set(parts))
-    return uniq
+  const startEditingEvent = () => {
+    setEditingName(name)
+    setEditingDescription(description)
+    setEditingDate(eventDate)
+    setIsEditingEvent(true)
+  }
+
+  const cancelEditingEvent = () => {
+    setIsEditingEvent(false)
+  }
+
+  const saveEventChanges = async () => {
+    if (!editingName || editingName.trim() === '') {
+      setNotice({ type: 'error', text: 'Event name is required' })
+      return
+    }
+    if (!editingDate) {
+      setNotice({ type: 'error', text: 'Event date is required' })
+      return
+    }
+    try {
+      setSavingEvent(true)
+      const res = await fetch(`/api/events/${shareCode}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingName, description: editingDescription, eventDate: editingDate })
+      })
+      if (!res.ok) throw new Error('Failed to update event')
+      const updated = await res.json()
+      setName(updated.name)
+      setDescription(updated.description)
+      setEventDate(updated.eventDate)
+      setIsEditingEvent(false)
+      setNotice({ type: 'success', text: 'Event updated' })
+    } catch (e) {
+      console.error(e)
+      setNotice({ type: 'error', text: 'Error updating event' })
+    } finally { setSavingEvent(false) }
   }
 
   
@@ -104,7 +145,11 @@ function App() {
         setShareCode(stored)
         // Load sessions with IDs to restore monitoring UI
         fetch(`/api/events/${stored}`).then(r => r.ok ? r.json() : null).then(details => {
-          if (details && details.sessions) setServerSessions(details.sessions)
+          if (!details) return
+          if (details.sessions) setServerSessions(details.sessions)
+          if (typeof details.name === 'string') setName(details.name)
+          if (typeof details.description === 'string') setDescription(details.description || '')
+          if (details.eventDate) setEventDate(details.eventDate)
         }).catch(() => {})
       }
     } catch {}
@@ -121,18 +166,33 @@ function App() {
 
   const isCreated = !!shareCode
 
-  const addToCalendar = () => {
-    if (!eventDate || !sessionTitle) return
+  const addToCalendar = async () => {
+    if (!isCreated && !eventDate) {
+      setNotice({ type: 'error', text: 'Pick an event date first' })
+      return
+    }
     const start = '09:00'
     const end = hhmmAdd(start, Number(duration))
     if (!isCreated) {
       const id = `tmp-${Date.now()}`
-      setLocalSessions((prev) => [...prev, { id, title: sessionTitle, startTime: start, endTime: end, location: '' }])
+      setLocalSessions((prev) => [...prev, { id, title: (sessionTitle && sessionTitle.trim()) ? sessionTitle : 'Session', startTime: start, endTime: end, location: '' }])
       setSessionTitle('')
       setNotice({ type: 'success', text: 'Session added to calendar draft' })
     } else {
-      // Event already created: we currently don't have an API to add sessions.
-      setNotice({ type: 'info', text: 'Adding new sessions after creation is not supported yet.' })
+      try {
+        const res = await fetch(`/api/events/${shareCode}/sessions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: (sessionTitle && sessionTitle.trim()) ? sessionTitle : 'Session', start, end, location: '' })
+        })
+        if (!res.ok) throw new Error('Failed to add session')
+        const data = await res.json()
+        setServerSessions(data.sessions || [])
+        setSessionTitle('')
+        setNotice({ type: 'success', text: 'Session added' })
+      } catch (e) {
+        console.error(e)
+        setNotice({ type: 'error', text: 'Error adding session' })
+      }
     }
   }
 
@@ -153,6 +213,7 @@ function App() {
     try {
       const body = {
         name,
+        description,
         eventDate,
         sessions: localSessions.map((s) => ({ title: s.title, start: s.startTime, end: s.endTime, location: s.location || '' }))
       }
@@ -194,7 +255,8 @@ function App() {
         body: JSON.stringify({ start: newStart, end: newEnd })
       })
       if (!res.ok) throw new Error('Failed to update session times')
-      setServerSessions((prev) => prev.map(s => s.id === id ? { ...s, startTime: newStart, endTime: newEnd } : s))
+      const data = await res.json()
+      setServerSessions(data.sessions || [])
       setNotice({ type: 'success', text: 'Session time saved' })
     } catch (e) {
       console.error(e)
@@ -206,6 +268,29 @@ function App() {
     const start = toHHmmFromHour(startHour)
     const end = toHHmmFromHour(endHour)
     return handleSessionTimeChange(id, start, end)
+  }
+
+  // Preserve minutes (e.g., 09:30) coming from the calendar
+  const handleSessionUpdateExact = (id, startHHmm, endHHmm) => {
+    return handleSessionTimeChange(id, startHHmm, endHHmm)
+  }
+
+  const handleSessionRemove = async (id) => {
+    if (!isCreated) {
+      setLocalSessions(prev => prev.filter(s => String(s.id) !== String(id)))
+      setNotice({ type: 'success', text: 'Session removed' })
+      return
+    }
+    try {
+      const res = await fetch(`/api/events/${shareCode}/sessions/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete session')
+      const data = await res.json()
+      setServerSessions(data.sessions || [])
+      setNotice({ type: 'success', text: 'Session removed' })
+    } catch (e) {
+      console.error(e)
+      setNotice({ type: 'error', text: 'Error removing session' })
+    }
   }
 
   const copyText = async (text) => {
@@ -251,8 +336,11 @@ function App() {
   }
 
   const sessionsForView = (isCreated ? serverSessions : localSessions).map(s => {
-    const [sh] = (s.startTime || '').split(':').map(Number)
-    const [eh] = (s.endTime || '').split(':').map(Number)
+    // Extract time from ISO datetime (e.g., "2025-11-26T09:00:00" -> "09:00") or use as-is if already HH:mm
+    const startTimeStr = s.startTime ? (s.startTime.includes('T') ? s.startTime.split('T')[1].substring(0, 5) : s.startTime) : ''
+    const endTimeStr = s.endTime ? (s.endTime.includes('T') ? s.endTime.split('T')[1].substring(0, 5) : s.endTime) : ''
+    const [sh] = (startTimeStr || '').split(':').map(Number)
+    const [eh] = (endTimeStr || '').split(':').map(Number)
     return { ...s, startHour: sh, endHour: eh }
   })
 
@@ -278,87 +366,102 @@ function App() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: 3 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={5}>
-            <Stack spacing={3}>
+      <Container maxWidth="lg" sx={{ py: 3, overflowX: 'hidden' }}>
+        <Grid container spacing={{ xs: 2, md: 3 }} alignItems="flex-start" justifyContent="center">
+          <Grid item xs={12} sm={6} md={6} sx={{ minWidth: 0 }}>
+            <Stack spacing={{ xs: 2, md: 3 }} sx={{ width: '100%', maxWidth: 420, mx: 'auto' }}>
               <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>Create event</Typography>
-                  <Stack spacing={2}>
-                    <TextField label="Event name" value={name} onChange={(e) => setName(e.target.value)} placeholder="BBQ" fullWidth />
-                    <TextField label="Event date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} inputProps={{ min: new Date().toISOString().split('T')[0] }} fullWidth InputLabelProps={{ shrink: true }} />
-                    <Divider />
-                    <TextField label="Session title" value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Cake" fullWidth />
-                    <FormControl fullWidth>
-                      <InputLabel id="duration-label">Duration</InputLabel>
-                      <Select labelId="duration-label" label="Duration" value={duration} onChange={(e) => setDuration(e.target.value)}>
-                        <MenuItem value={30}>30 min</MenuItem>
-                        <MenuItem value={60}>1 h</MenuItem>
-                        <MenuItem value={120}>2 h</MenuItem>
-                      </Select>
-                    </FormControl>
+                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                  <Typography variant="h6" gutterBottom>{isEditingEvent ? 'Edit event' : 'Create event'}</Typography>
+                  <Stack spacing={{ xs: 1.5, md: 2 }}>
+                    <TextField label="Event name" value={isEditingEvent ? editingName : name} onChange={(e) => isEditingEvent ? setEditingName(e.target.value) : setName(e.target.value)} placeholder="BBQ" fullWidth disabled={isCreated && !isEditingEvent} />
+                    <TextField label="Description (optional)" value={isEditingEvent ? editingDescription : description} onChange={(e) => isEditingEvent ? setEditingDescription(e.target.value) : setDescription(e.target.value)} fullWidth multiline rows={3} disabled={isCreated && !isEditingEvent} />
+                    <TextField label="Event date" type="date" value={isEditingEvent ? editingDate : eventDate} onChange={(e) => isEditingEvent ? setEditingDate(e.target.value) : setEventDate(e.target.value)} inputProps={{ min: new Date().toISOString().split('T')[0] }} fullWidth InputLabelProps={{ shrink: true }} disabled={isCreated && !isEditingEvent} />
+                    {isEditingEvent && (
+                      <>
+                        <Divider />
+                        <Typography variant="subtitle2">Add session</Typography>
+                        <TextField label="Session title" value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Cake" fullWidth />
+                        <Button variant="outlined" startIcon={<AddIcon />} onClick={addToCalendar} fullWidth>
+                          Add Session
+                        </Button>
+                      </>
+                    )}
+                    {!isCreated && (
+                      <>
+                        <Divider />
+                        <TextField label="Session title" value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Cake" fullWidth />
+                      </>
+                    )}
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                      <Button variant="outlined" startIcon={<AddIcon />} onClick={addToCalendar} fullWidth>
-                        Add to Calendar (9:00)
-                      </Button>
-                      <Button variant="contained" startIcon={<EventAvailableIcon />} onClick={createEvent} disabled={isCreated} fullWidth>
-                        Create Event
-                      </Button>
+                      {!isCreated && (
+                        <>
+                          <Button variant="outlined" startIcon={<AddIcon />} onClick={addToCalendar} fullWidth>
+                            Add to Calendar (9:00)
+                          </Button>
+                          <Button variant="contained" startIcon={<EventAvailableIcon />} onClick={createEvent} disabled={isCreated} fullWidth>
+                            Create Event
+                          </Button>
+                        </>
+                      )}
+                      {isCreated && !isEditingEvent && (
+                        <Button variant="outlined" onClick={startEditingEvent} fullWidth>
+                          Edit Event
+                        </Button>
+                      )}
+                      {isCreated && isEditingEvent && (
+                        <>
+                          <Button variant="contained" onClick={saveEventChanges} disabled={savingEvent} fullWidth>
+                            Save Changes
+                          </Button>
+                          <Button variant="outlined" onClick={cancelEditingEvent} disabled={savingEvent} fullWidth>
+                            Cancel
+                          </Button>
+                        </>
+                      )}
                     </Stack>
-                    {isCreated && (
+                    {isCreated && !isEditingEvent && (
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography variant="caption" color="success.main" sx={{ flexGrow: 1 }}>Share code: {shareCode}</Typography>
                         <Button size="small" variant="text" color="secondary" onClick={resetEvent}>Create New Event</Button>
-                      </Stack>
-                    )}
-                    {/* RSVP removed: attendee list no longer shown */}
-                    {isCreated && (
-                      <Stack spacing={1}>
-                        <FormBuilder code={shareCode} />
-                        <TextField
-                          label="Organizer email"
-                          placeholder="you@yourdomain.com"
-                          value={organizerEmail}
-                          onChange={(e) => setOrganizerEmail(e.target.value)}
-                          fullWidth
-                        />
-                        <TextField
-                          label="Organizer name (optional)"
-                          placeholder="Your name"
-                          value={organizerName}
-                          onChange={(e) => setOrganizerName(e.target.value)}
-                          fullWidth
-                        />
-                        <TextField
-                          placeholder="Enter invitees (comma, space, or new line separated emails)"
-                          value={invitesText}
-                          onChange={(e) => setInvitesText(e.target.value)}
-                          multiline rows={3}
-                          fullWidth
-                        />
-                        <Button
-                          variant="contained"
-                          startIcon={<SendIcon />}
-                          disabled={sendingInvites || !/^([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/.test((organizerEmail || '').trim())}
-                          onClick={sendInvites}
-                        >
-                          Send Invites
-                        </Button>
                       </Stack>
                     )}
                   </Stack>
                 </CardContent>
               </Card>
 
+              {isCreated && (
+                <FormBuilder code={shareCode} />
+              )}
+
+              {isCreated && (
+                <ResponsesPanel code={shareCode} />
+              )}
+
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom><InfoOutlinedIcon sx={{ mr: 1, verticalAlign: 'middle' }} />How it works</Typography>
                   <List dense>
-                    <ListItem><ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon><ListItemText primary="Enter an event name and pick a date (today or later)." /></ListItem>
-                    <ListItem><ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon><ListItemText primary="Add one or more sessions; adjust times later if needed." /></ListItem>
-                    <ListItem><ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon><ListItemText primary="Create the event to get a shareable link." /></ListItem>
-                    <ListItem><ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon><ListItemText primary="Share the link or QR so guests can add to their calendars." /></ListItem>
+                    <ListItem>
+                      <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="Create your event: enter a name and pick a date." />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="Add sessions, then drag them on the calendar to adjust times." />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="After creation, use Edit Event to change name/description/date and add or remove sessions (× on a session)." />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="Build your guest form (text, number, date, yes/no, radio, checkboxes) and save it." />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="Share the link or QR. View responses in the table. Guests can add sessions to their calendars (.ics)." />
+                    </ListItem>
                   </List>
                 </CardContent>
               </Card>
@@ -375,7 +478,7 @@ function App() {
                       helperText={`${Math.min(feedbackInput.length, FEEDBACK_MAX)}/${FEEDBACK_MAX}`}
                       error={feedbackInput.length > FEEDBACK_MAX}
                     />
-                    <Button variant="contained" startIcon={<SendIcon />} disabled={feedbackSubmitting || feedbackInput.trim().length === 0 || feedbackInput.length > FEEDBACK_MAX} onClick={async () => {
+                    <Button variant="contained" disabled={feedbackSubmitting || feedbackInput.trim().length === 0 || feedbackInput.length > FEEDBACK_MAX} onClick={async () => {
                       const text = (feedbackInput || '').trim()
                       if (!text) return
                       try {
@@ -422,14 +525,16 @@ function App() {
             </Stack>
           </Grid>
 
-          <Grid item xs={12} md={7}>
+          <Grid item xs={12} sm={6} md={6} sx={{ position: { md: 'sticky' }, top: { md: 24 }, minWidth: 0 }}>
             <Card>
-              <CardContent>
+              <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" gutterBottom>Calendar preview</Typography>
                 <CalendarView
                   eventDate={eventDate ? new Date(eventDate) : null}
                   sessions={sessionsForView}
                   onSessionUpdate={handleSessionUpdateByHour}
+                  onSessionUpdateExact={handleSessionUpdateExact}
+                  onSessionRemove={handleSessionRemove}
                 />
               </CardContent>
             </Card>

@@ -2,6 +2,7 @@ package com.example.quickagenda.service;
 
 import com.example.quickagenda.dto.EventCreateRequest;
 import com.example.quickagenda.dto.EventDetailResponse;
+import com.example.quickagenda.dto.EventUpdateRequest;
 import com.example.quickagenda.dto.SessionCreateRequest;
 import com.example.quickagenda.dto.SessionResponse;
 import com.example.quickagenda.dto.SessionTimeUpdateRequest;
@@ -14,6 +15,7 @@ import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.DateTime;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.CalScale;
+import net.fortuna.ical4j.model.property.Description;
 import net.fortuna.ical4j.model.property.Location;
 import net.fortuna.ical4j.model.property.ProdId;
 import net.fortuna.ical4j.model.property.Version;
@@ -52,6 +54,7 @@ public class EventService {
         Event event = new Event();
         event.setName(request.getName());
         event.setEventDate(request.getEventDate());
+        event.setDescription(request.getDescription());
         event.setShareCode(generateShareCode());
 
         Event savedEvent = eventRepository.save(event);
@@ -106,6 +109,9 @@ public class EventService {
             if (s.getLocation() != null && !s.getLocation().isBlank()) {
                 vevent.getProperties().add(new Location(s.getLocation()));
             }
+            if (event.getDescription() != null && !event.getDescription().isBlank()) {
+                vevent.getProperties().add(new Description(event.getDescription()));
+            }
             calendar.getComponents().add(vevent);
         }
 
@@ -126,7 +132,7 @@ public class EventService {
                 s.getEndTime(),
                 s.getLocation()
         )).collect(Collectors.toList());
-        return new EventDetailResponse(event.getId(), event.getName(), event.getEventDate(), event.getShareCode(), sessionDtos);
+        return new EventDetailResponse(event.getId(), event.getName(), event.getEventDate(), event.getDescription(), event.getShareCode(), sessionDtos);
     }
 
     @Transactional
@@ -146,6 +152,88 @@ public class EventService {
         LocalDateTime end = LocalDateTime.of(date, LocalTime.parse(body.getEnd(), TIME_FMT));
 
         sessionRepository.updateSessionTimes(sessionId, start, end);
+    }
+
+    @Transactional
+    public EventDetailResponse addSession(String code, SessionCreateRequest request) {
+        Event event = eventRepository.findByShareCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        LocalDate date = event.getEventDate();
+        Session sess = new Session();
+        sess.setTitle(request.getTitle());
+        sess.setLocation(request.getLocation());
+        LocalDateTime start = LocalDateTime.of(date, LocalTime.parse(request.getStart(), TIME_FMT));
+        LocalDateTime end = LocalDateTime.of(date, LocalTime.parse(request.getEnd(), TIME_FMT));
+        sess.setStartTime(start);
+        sess.setEndTime(end);
+        sess.setEvent(event);
+        sessionRepository.save(sess);
+
+        List<Session> sessions = sessionRepository.findByEvent(event);
+        return toDetailResponse(event, sessions);
+    }
+
+    @Transactional
+    public EventDetailResponse deleteSession(String code, Long sessionId) {
+        Event event = eventRepository.findByShareCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (session.getEvent() == null || !session.getEvent().getId().equals(event.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        sessionRepository.delete(session);
+
+        List<Session> sessions = sessionRepository.findByEvent(event);
+        return toDetailResponse(event, sessions);
+    }
+
+    @Transactional
+    public EventDetailResponse updateEvent(String code, EventUpdateRequest request) {
+        Event event = eventRepository.findByShareCode(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            event.setName(request.getName());
+        }
+        if (request.getDescription() != null) {
+            event.setDescription(request.getDescription());
+        }
+        if (request.getEventDate() != null) {
+            event.setEventDate(request.getEventDate());
+        }
+
+        Event updated = eventRepository.save(event);
+        
+        // Update sessions if provided
+        if (request.getSessions() != null) {
+            // Delete existing sessions
+            List<Session> existingSessions = sessionRepository.findByEvent(updated);
+            sessionRepository.deleteAll(existingSessions);
+            
+            // Create new sessions
+            List<Session> toSave = new ArrayList<>();
+            LocalDate date = updated.getEventDate();
+            for (SessionCreateRequest s : request.getSessions()) {
+                Session sess = new Session();
+                sess.setTitle(s.getTitle());
+                sess.setLocation(s.getLocation());
+                LocalDateTime start = LocalDateTime.of(date, LocalTime.parse(s.getStart(), TIME_FMT));
+                LocalDateTime end = LocalDateTime.of(date, LocalTime.parse(s.getEnd(), TIME_FMT));
+                sess.setStartTime(start);
+                sess.setEndTime(end);
+                sess.setEvent(updated);
+                toSave.add(sess);
+            }
+            if (!toSave.isEmpty()) {
+                sessionRepository.saveAll(toSave);
+            }
+        }
+        
+        List<Session> sessions = sessionRepository.findByEvent(updated);
+        return toDetailResponse(updated, sessions);
     }
     private String generateShareCode() {
         RandomStringGenerator gen = new RandomStringGenerator.Builder()

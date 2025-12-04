@@ -9,7 +9,9 @@ import com.example.quickagenda.repository.EventRepository;
 import com.example.quickagenda.repository.FormFieldRepository;
 import com.example.quickagenda.repository.FormRepository;
 import com.example.quickagenda.repository.FormResponseRepository;
+import com.example.quickagenda.dto.FormResponseDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,7 +81,12 @@ public class FormService {
         form.setActive(req.isActive());
         form.setOpenAt(req.getOpenAt());
         form.setCloseAt(req.getCloseAt());
-        Form saved = formRepository.save(form);
+        Form saved;
+        try {
+            saved = formRepository.save(form);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A form already exists for this event");
+        }
         // Replace fields
         fieldRepository.deleteByForm(saved);
         int idx = 0;
@@ -139,5 +146,21 @@ public class FormService {
         resp.setAnswersJson(json);
         resp.setUpdatedAt(now);
         responseRepository.save(resp);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FormResponseDto> listResponses(String code) {
+        Event event = getEventOr404(code);
+        Form form = formRepository.findByEvent(event).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        List<FormResponse> list = responseRepository.findByFormOrderByCreatedAtDesc(form);
+        return list.stream().map(r -> {
+            Map<String, Object> ans;
+            try {
+                ans = objectMapper.readValue(r.getAnswersJson() == null ? "{}" : r.getAnswersJson(), Map.class);
+            } catch (Exception e) {
+                ans = Map.of();
+            }
+            return new FormResponseDto(r.getEmail(), r.getCreatedAt(), ans);
+        }).collect(Collectors.toList());
     }
 }

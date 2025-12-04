@@ -3,10 +3,12 @@ package com.example.quickagenda.controller;
 import com.example.quickagenda.dto.FormConfigResponse;
 import com.example.quickagenda.dto.FormSubmitRequest;
 import com.example.quickagenda.dto.FormUpsertRequest;
+import com.example.quickagenda.dto.FormResponseDto;
 import com.example.quickagenda.service.FormService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/events/{code}/form")
@@ -29,6 +31,11 @@ public class FormController {
                                        @RequestBody FormUpsertRequest req) {
         formService.upsertForm(code, req);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @GetMapping("/admin/responses")
+    public ResponseEntity<List<FormResponseDto>> listResponses(@PathVariable("code") String code) {
+        return ResponseEntity.ok(formService.listResponses(code));
     }
 
     // Public endpoints (invitees)

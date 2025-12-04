@@ -16,6 +16,7 @@ public class EventDetailResponse {
     private Long id;
     private String name;
     private LocalDate eventDate;
+    private String description;
     private String shareCode;
     private List<SessionResponse> sessions;
 }

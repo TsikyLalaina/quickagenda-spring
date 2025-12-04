@@ -5,8 +5,10 @@
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/controller/FormController.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/EventCreateRequest.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/EventDetailResponse.java
+/home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/EventUpdateRequest.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/FormConfigResponse.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/FormFieldDto.java
+/home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/FormResponseDto.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/FormSubmitRequest.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/FormUpsertRequest.java
 /home/lalaina/quickagenda/quickagenda-backend/src/main/java/com/example/quickagenda/dto/SessionCreateRequest.java

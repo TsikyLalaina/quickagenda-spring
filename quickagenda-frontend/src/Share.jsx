@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import CalendarView from './CalendarView'
+import CalendarView from './CalendarViewRBC'
 import DynamicForm from './DynamicForm'
 import QRCode from 'qrcode'
 import AppBar from '@mui/material/AppBar'
@@ -187,6 +187,11 @@ export default function Share() {
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     {formatFullDate(eventDateObj)}
                   </Typography>
+                  {event.description && (
+                    <Typography variant="body2" sx={{ mt: 1, mb: 2 }}>
+                      {event.description}
+                    </Typography>
+                  )}
                   <Divider sx={{ my: 2 }} />
                   <CalendarView eventDate={eventDateObj} sessions={sessionsForView} readOnly />
                 </CardContent>
@@ -239,9 +244,14 @@ export default function Share() {
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>How it works</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Share this page with your guests. They can view the agenda and add sessions to their calendars. You can also download an .ics file for a one-time import.
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    This page is a read‑only view of the event. You can:
                   </Typography>
+                  <Typography variant="body2" color="text.secondary">- View the agenda for the selected day.</Typography>
+                  <Typography variant="body2" color="text.secondary">- Add it to your calendar using the Google Calendar button.</Typography>
+                  <Typography variant="body2" color="text.secondary">- Download a universal .ics file for manual import.</Typography>
+                  <Typography variant="body2" color="text.secondary">- Share the event link or QR code with others.</Typography>
+                  <Typography variant="body2" color="text.secondary">- If enabled by the organizer, fill out the form on this page.</Typography>
                 </CardContent>
               </Card>
             </Stack>

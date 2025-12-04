@@ -15,5 +15,6 @@ import java.util.List;
 public class EventCreateRequest {
     private String name;
     private LocalDate eventDate;
+    private String description;
     private List<SessionCreateRequest> sessions;
 }
